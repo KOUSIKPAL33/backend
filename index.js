@@ -1,18 +1,30 @@
 const express = require('express');
+const cors = require("cors");
 const app = express();
 require('dotenv').config();
 const port = process.env.PORT || 5000;
 const connecttomongo = require("./db");
 connecttomongo();
 
+// Allowed origins list
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://frontend-ecru-five-46.vercel.app"
+];
+
+// CORS Middleware
 app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173"); 
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
 
-    if (req.method === 'OPTIONS') {
+    if (req.method === "OPTIONS") {
         return res.status(200).end();
     }
+
     next();
 });
 
