@@ -1,3 +1,5 @@
+const nodemailer = require("nodemailer");
+require("dotenv").config(); // At the top
 const express = require('express');
 const routers = express.Router();
 const user = require('../models/user');
@@ -57,6 +59,7 @@ routers.get("/user", auth, async (req, res) => {
                 name: userData.name, 
                 cartItems: userData.shopping_cart,
                 mobileno:userData.mobileno,
+                email:userData.email,
                 addresses:userData.addresses,
             });
         } else {
@@ -67,5 +70,74 @@ routers.get("/user", auth, async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
+let otpStore = {};
+
+routers.post("/send-otp", async (req, res) => {
+  const { email } = req.body;
+
+  const userExist = await user.findOne({ email });
+  if (!userExist) return res.json({ success: false, message: "User not found" });
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  otpStore[email] = otp;
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Password Reset OTP",
+    text: `Your OTP is: ${otp}`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) return res.json({ success: false, message: "Failed to send email" });
+    res.json({ success: true });
+  });
+});
+
+routers.post("/verify-otp-reset", async (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+
+    if (!email || !otp || !password) {
+      return res.status(400).json({ success: false, message: "Missing fields" });
+    }
+
+    // Check OTP
+    const storedOtp = otpStore[email];
+    if (!storedOtp || storedOtp !== otp) {
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    }
+
+    // Find user
+    const curruser = await user.findOne({ email });
+    if (!curruser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Update user password
+    curruser.password = hashedPassword;
+    await curruser.save();
+
+    // Clear OTP after use
+    delete otpStore[email];
+
+    res.json({ success: true, message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Error resetting password:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
 
 module.exports = routers;

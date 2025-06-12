@@ -40,6 +40,7 @@ const addToCartItemController = async (request, response) => {
         $push: {
           shopping_cart: {
             productId,
+            shopname:productDetails.shopname,
             name: productDetails.name,
             imgSrc: productDetails.imgSrc,
             option: productDetails.option,
@@ -104,37 +105,30 @@ const getCartItemController = async (request, response) => {
   }
 };
 
-const updateCartItemQtyController = async (request, response) => {
-  try {
-    const userId = request.user.id
-    const { _id, qty } = request.body
+const updateCartItemQtyController = async (req, res) => {
+  const userId = req.user.id; 
+  const { productId, action } = req.body;
 
-    if (!_id || !qty) {
-      return response.status(400).json({
-        message: "provide _id, qty"
-      })
+  try {
+    const user = await UserModel.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const item = user.shopping_cart.find(item => item.productId.toString() === productId);
+    if (!item) return res.status(404).json({ error: 'Product not found in cart' });
+
+    if (action === 'increase' && item.quantity < 10) {
+      item.quantity += 1;
+    } else if (action === 'decrease' && item.quantity > 1) {
+      item.quantity -= 1;
+    } else {
+      return res.status(400).json({ error: 'Quantity limit reached' });
     }
 
-    const updateCartitem = await CartProductModel.updateOne({
-      _id: _id,
-      userId: userId
-    }, {
-      quantity: qty
-    })
-
-    return response.json({
-      message: "Update cart",
-      success: true,
-      error: false,
-      data: updateCartitem
-    })
-
-  } catch (error) {
-    return response.status(500).json({
-      message: error.message || error,
-      error: true,
-      success: false
-    })
+    await user.save();
+    return res.status(200).json({ message: 'Cart quantity updated successfully', cart: user.shopping_cart });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update cart quantity' });
   }
 }
 

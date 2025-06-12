@@ -9,12 +9,12 @@ const mongoose = require('mongoose');
 
 // Generic schema for product
 const productSchema = new mongoose.Schema({
-    Shop_name: String,
-    Image: String,
-    Name: String,
-    Category: String,
-    Price: Number,
-    Available: Boolean,
+  Shop_name: String,
+  Image: String,
+  Name: String,
+  Category: String,
+  Price: Number,
+  Available: Boolean,
 }, { strict: false }); // allow dynamic fields if any
 
 
