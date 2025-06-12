@@ -37,6 +37,7 @@ app.use('/api/', require("./routes/ShopsData"));
 app.use('/api/cart', require("./routes/cartRouter"));
 app.use('/api/address',require("./routes/addressRoter"));
 app.use('/api/', require("./routes/adminRouter"));
+app.use('/api/order',require("./routes/ordersRouter"));
 
 
 app.listen(port, () => {
