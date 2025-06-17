@@ -2,13 +2,17 @@ const mongoose = require('mongoose');
 
 const OrderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'users' },
-  items: [{
-    shopName:String,
-    imgSrc:String,
-    itemName: String,
-    quantity: Number,
-    price: Number,
-    totalPrice:Number,
+  ordersbyshop: [{
+    shopName: String,
+    status: { type: String, enum: ['pending', 'preparing', 'out for delivery', 'delivered'], default: 'pending' },
+    items: [{
+      imgSrc: String,
+      itemName: String,
+      quantity: Number,
+      price: Number,
+      totalPrice: Number,
+    }],
+    shopTotal:Number,
   }],
   totalAmount: Number,
   status: { type: String, enum: ['pending', 'preparing', 'out for delivery', 'delivered'], default: 'pending' },
