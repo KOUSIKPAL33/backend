@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const AdminUser = require('../models/adminUser');
 const JWT_SECRET = process.env.JWT_SECRET || "yoursecretkey";
 const mongoose = require('mongoose');
-const Dominos = require('../models/Dominos');
+const Dominos = require('../models/dominos');
 
 
 // Generic schema for product
