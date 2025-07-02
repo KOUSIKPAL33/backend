@@ -139,5 +139,18 @@ routers.post("/verify-otp-reset", async (req, res) => {
   }
 });
 
+routers.post('/contactus', async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+    if (!name || !email || !message) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+    await Contactus.create({ name, email, message });
+    res.json({ success: true, message: "Message stored successfully" });
+  } catch (error) {
+    console.error("Error saving contact message:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
 
 module.exports = routers;

@@ -1,4 +1,3 @@
-const CartProductModel = require("../models/cartproduct.js");
 const UserModel = require("../models/user.js");
 
 const addToCartItemController = async (request, response) => {
@@ -6,7 +5,7 @@ const addToCartItemController = async (request, response) => {
     const userId = request.user.id;
     const { productId, productDetails } = request.body;
 
-    if (!productId) {
+    if (!productId || !productDetails) {
       return response.status(400).json({
         message: "Provide productId and product details",
         error: true,
@@ -14,6 +13,8 @@ const addToCartItemController = async (request, response) => {
       });
     }
 
+    // Check if the same product with the same option is already in the cart
+    const user = await UserModel.findById(userId);
     const checkItemCart = await UserModel.findOne({
       _id: userId,
       "shopping_cart.productId": productId
@@ -26,43 +27,21 @@ const addToCartItemController = async (request, response) => {
       });
     }
 
-    const cartItem = new CartProductModel({
+    // Add to cart
+    user.shopping_cart.push({
+      productId,
+      shopname: productDetails.shopname,
+      name: productDetails.name,
+      imgSrc: productDetails.imgSrc,
+      option: productDetails.option,
+      price: productDetails.price,
       quantity: 1,
-      userId: userId,
-      productId: productId
     });
 
-    const save = await cartItem.save();
-
-    const updateCartUser = await UserModel.updateOne(
-      { _id: userId },
-      {
-        $push: {
-          shopping_cart: {
-            productId,
-            shopname:productDetails.shopname,
-            name: productDetails.name,
-            imgSrc: productDetails.imgSrc,
-            option: productDetails.option,
-            price: productDetails.price,
-            quantity: 1,
-          },
-        },
-      }
-    );
-
-    if (!updateCartUser.modifiedCount) {
-      return response.status(500).json({
-        message: "Failed to update user's shopping cart",
-        error: true,
-        success: false,
-      });
-    }
-
-    // console.log("Updated User's Cart:", updateCartUser);
+    await user.save();
 
     return response.json({
-      data: save,
+      data: user.shopping_cart,
       message: "Item added successfully",
       error: false,
       success: true
