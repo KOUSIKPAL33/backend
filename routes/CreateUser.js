@@ -25,12 +25,10 @@ const upload = multer({ storage });
 
 // Update user profile (name, email, mobile, profile image)
 routers.put("/update-profile", auth, upload.single("image"), async (req, res) => {
-  console.log("url hit")
   try {
     const userId = req.user.id;
     const { name, email, mobile } = req.body;
     let updateData = { name, email, mobileno: mobile };
-    console.log(updateData, "update data");
     // If a new image is uploaded, save its path
     if (req.file) {
       // Save only the relative path or filename as needed
@@ -79,8 +77,8 @@ routers.post("/createuser", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.log(error);
-    res.json({ success: false });
+    console.error("Error creating user:", error);
+    res.json({  success: false });
   }
 }
 );

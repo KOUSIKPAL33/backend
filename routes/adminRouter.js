@@ -67,7 +67,6 @@ router.post('/loginadmin', async (req, res) => {
 
 // PUT: Update product by ID in a shop-specific collection
 router.put('/update/:id', upload.single('image'), async (req, res) => {
-  //console.log("PUT /update/:id hit");
   const { id } = req.params;
   const { name, price, available, shop_name } = req.body;
   if (!shop_name) {
@@ -76,7 +75,9 @@ router.put('/update/:id', upload.single('image'), async (req, res) => {
 
   try {
     const Product = mongoose.model(shop_name, productSchema, shop_name);
-    //console.log(shop_name)
+    if (!name || !price || available === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
     const updateFields = {
       Name: name,
       Price: price,
@@ -85,7 +86,6 @@ router.put('/update/:id', upload.single('image'), async (req, res) => {
     if (req.file && req.file.filename) {
       updateFields.Image = `image/${req.file.filename}`;
     }
-    console.log(updateFields);
     const updatedProduct = await Product.findByIdAndUpdate(
       id,
       updateFields,
@@ -128,7 +128,6 @@ router.put('/dominos/update/:id', upload.single('image'), async (req, res) => {
     );
 
     if (!updated) {
-      console.log("object not found");
       return res.status(404).json({ message: 'Product not found' });
     }
 

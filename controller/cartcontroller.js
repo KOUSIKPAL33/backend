@@ -119,11 +119,10 @@ const deleteCartItemQtyController = async (request, response) => {
     if (!productId) {
       return response.status(400).json({ success: false, message: "Product ID is required." });
     }
-    console.log(userId, productId);
+   
     const mongoose = require('mongoose');
     const ObjectId = mongoose.Types.ObjectId;
     const productObjectId = new ObjectId(productId);
-    console.log(productObjectId);
     const result = await UserModel.findOneAndUpdate(
       { _id: userId }, // Match the user by their ID
       { $pull: { shopping_cart: { productId: productObjectId } } },
