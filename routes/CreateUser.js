@@ -3,72 +3,128 @@ require("dotenv").config(); // At the top
 const express = require('express');
 const routers = express.Router();
 const user = require('../models/user');
+const Contactus = require('../models/contactus');
 const auth = require("../middleware/auth.js")
 const jwt = require('jsonwebtoken');
 const bcrypt = require("bcryptjs");
 const saltRounds = 10;
+const multer = require('multer');
+const path = require('path');
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../public/image'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage });
+
+// Update user profile (name, email, mobile, profile image)
+routers.put("/update-profile", auth, upload.single("image"), async (req, res) => {
+  console.log("url hit")
+  try {
+    const userId = req.user.id;
+    const { name, email, mobile } = req.body;
+    let updateData = { name, email, mobileno: mobile };
+    console.log(updateData, "update data");
+    // If a new image is uploaded, save its path
+    if (req.file) {
+      // Save only the relative path or filename as needed
+      updateData.profileImage = `/image/${req.file.filename}`;
+    }
+
+    const updatedUser = await user.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        mobileno: updatedUser.mobileno,
+        profileImage: updatedUser.profileImage,
+        addresses: updatedUser.addresses,
+      }
+    });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
 
 routers.post("/createuser", async (req, res) => {
-    try {
-        const existingUser = await user.findOne({ email: req.body.email });
-        if (existingUser) {
-            return res.json({ success: false, message: "Email already exists" });
-        }
-        const salt = bcrypt.genSaltSync(saltRounds);
-        const hashpassword = bcrypt.hashSync(req.body.password, salt);
-        await user.create({
-            name: req.body.name,
-            email: req.body.email,
-            password: hashpassword,
-            mobileno: req.body.mobileno,
-        });
-        res.json({ success: true });
-    } catch (error) {
-        console.log(error);
-        res.json({ success: false });
+  try {
+    const existingUser = await user.findOne({ email: req.body.email });
+    if (existingUser) {
+      return res.json({ success: false, message: "Email already exists" });
     }
+    const salt = bcrypt.genSaltSync(saltRounds);
+    const hashpassword = bcrypt.hashSync(req.body.password, salt);
+    await user.create({
+      name: req.body.name,
+      email: req.body.email,
+      password: hashpassword,
+      mobileno: req.body.mobileno,
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false });
+  }
 }
 );
 
 // Login User
 routers.post("/loginuser",
-    async (req, res) => {
-        try {
-            const { email } = req.body;
-            let userData = await user.findOne({ email });
+  async (req, res) => {
+    try {
+      const { email } = req.body;
+      let userData = await user.findOne({ email });
 
 
-            if (!userData || !bcrypt.compareSync(req.body.password, userData.password)) {
-                return res.status(400).json({ errors: "Invalid credentials" });
-            }
+      if (!userData || !bcrypt.compareSync(req.body.password, userData.password)) {
+        return res.status(400).json({ errors: "Invalid credentials" });
+      }
 
-            const token = jwt.sign({ id: userData._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-            return res.json({ success: true, token });
-        } catch (error) {
-            console.error("Error during login:", error);
-            res.json({ success: false });
-        }
+      const token = jwt.sign({ id: userData._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      return res.json({ success: true, token });
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.json({ success: false });
     }
+  }
 );
 
 routers.get("/user", auth, async (req, res) => {
-    try {
-        const userData = await user.findById(req.user.id); 
-        if (userData) {
-            res.json({
-                name: userData.name, 
-                cartItems: userData.shopping_cart,
-                mobileno:userData.mobileno,
-                email:userData.email,
-                addresses:userData.addresses,
-            });
-        } else {
-            res.status(404).json({ message: "User not found" });
-        }
-    } catch (error) {
-        console.error("Error fetching user:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+  try {
+    const userData = await user.findById(req.user.id);
+    if (userData) {
+      res.json({
+        name: userData.name,
+        cartItems: userData.shopping_cart,
+        mobileno: userData.mobileno,
+        email: userData.email,
+        addresses: userData.addresses,
+        profileImage: userData.profileImage,
+      });
+    } else {
+      res.status(404).json({ message: "User not found" });
     }
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
 });
 let otpStore = {};
 
@@ -152,5 +208,4 @@ routers.post('/contactus', async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
-
 module.exports = routers;

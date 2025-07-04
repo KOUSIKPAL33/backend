@@ -22,7 +22,8 @@ const userSchema = new mongoose.Schema({
     location: { type: String, required: true, },
     }
   ],
-  orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'orders' }]
+  orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'orders' }],
+   profileImage: { type: String, default: "" },
 });
 
 module.exports = mongoose.model('users', userSchema);
