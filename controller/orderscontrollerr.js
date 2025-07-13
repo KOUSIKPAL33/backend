@@ -11,12 +11,11 @@ const createOrderController = async (req, res) => {
       return res.status(400).json({ error: "User not found or cart is empty" });
     }
 
-    // 1. Group items by shopName
+    // Group items by shopName
     const ordersByShopMap = new Map();
 
     items.forEach(item => {
       const shopName = item.shopname || "unknown";
-
       const formattedItem = {
         imgSrc: item.imgSrc,
         itemName: item.name,
@@ -39,24 +38,24 @@ const createOrderController = async (req, res) => {
       }
     });
 
-
-
-    // 2. Convert map to array
     const ordersbyshop = Array.from(ordersByShopMap.values());
 
-    // 3. Create new order document
     const newOrder = await Order.create({
       userId,
       ordersbyshop,
       totalAmount,
-      deliveryLocation,
+      deliveryLocation: {
+        name: deliveryLocation.name,
+        mobileno: deliveryLocation.mobileno,
+        location: deliveryLocation.location
+      },
       status: 'pending'
     });
 
-    // 4. Update user document
     user.orders.push(newOrder._id);
     user.shopping_cart = [];
     await user.save();
+
     res.status(200).json({ message: "Order created successfully", order: newOrder });
 
   } catch (err) {
@@ -65,15 +64,22 @@ const createOrderController = async (req, res) => {
   }
 };
 
+
 const getShopOrdersController = async (req, res) => {
   const { shopName } = req.params;
+  if (!shopName) {
+    return res.status(400).json({ error: "Shop name is required" });
+  }
+
   try {
     const orders = await Order.find({
-      'ordersbyshop.shopName': shopName
+      'ordersbyshop.shopName': { $regex: new RegExp(`^${shopName}$`, 'i') }  // case-insensitive match
     }).populate('userId', 'name mobileno');
 
     const filteredOrders = orders.map(order => {
-      const shopOrder = order.ordersbyshop.find(shop => shop.shopName === shopName);
+      const shopOrder = order.ordersbyshop.find(
+        shop => shop.shopName.toLowerCase() === shopName.toLowerCase() // also ensure this match is exact case-insensitive
+      );
 
       return {
         orderId: order._id,
@@ -86,13 +92,14 @@ const getShopOrdersController = async (req, res) => {
         shopOrder
       };
     });
-    res.status(200).json(filteredOrders);
 
+    res.status(200).json(filteredOrders);
   } catch (err) {
     console.error("Shop Order Fetch Error:", err);
     res.status(500).json({ error: "Failed to fetch shop orders" });
   }
 };
+
 
 
 const getOrdersController = async (req, res) => {

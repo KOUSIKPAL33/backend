@@ -21,6 +21,7 @@ const productSchema = new mongoose.Schema({
 
 const multer = require('multer');
 const path = require('path');
+
 // Save to public/image folder
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -34,7 +35,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-
+// POST: Admin login
 router.post('/loginadmin', async (req, res) => {
   const { email, password, shop } = req.body;
   try {
@@ -64,8 +65,8 @@ router.post('/loginadmin', async (req, res) => {
   }
 });
 
-
 // PUT: Update product by ID in a shop-specific collection
+
 router.put('/update/:id', upload.single('image'), async (req, res) => {
   const { id } = req.params;
   const { name, price, available, shop_name } = req.body;
@@ -191,6 +192,101 @@ router.post('/product/add', upload.single('image'), async (req, res) => {
   } catch (err) {
     console.error('Error saving product:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /admin/:shop
+router.get('/admin/:shop', async (req, res) => {
+  const { shop } = req.params;
+
+  try {
+    const admin = await AdminUser.findOne({ shop }).select('-password');
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin user not found' });
+    }
+    res.json({ success: true, data: admin });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/category/add', async (req, res) => {
+  const { category, shop } = req.body;
+
+  if (!category || !shop) {
+    return res.status(400).json({ error: 'Category and shop name are required' });
+  }
+
+  // Capitalize first letter
+  const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+
+  try {
+    const collectionName = `category_${shop}`;
+    const CategoryModel = mongoose.connection.collection(collectionName);
+
+    const filter = { filterName: "Category" };
+
+    // Check if the category already exists
+    const existingDoc = await CategoryModel.findOne(filter);
+    if (existingDoc && existingDoc.values.includes(formattedCategory)) {
+      return res.status(409).json({ error: 'Category already exists' });
+    }
+
+    const updateResult = await CategoryModel.updateOne(
+      filter,
+      { $addToSet: { values: formattedCategory } },
+      { upsert: true }
+    );
+
+    res.status(200).json({ message: 'Category added successfully', updateResult });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error while adding category' });
+  }
+});
+
+
+router.post('/admin/update/:shop', upload.single('profileImage'), async (req, res) => {
+  const { shop } = req.params;
+  const { name, email, mobile } = req.body;
+  const profileImage = req.file ? `/image/${req.file.filename}` : null;
+
+  if (!name || !email || !mobile || !shop) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  const updateFields = {
+   name,email,mobile,
+  };  
+
+  if (profileImage) {
+    updateFields.profileImage = profileImage;
+  }
+
+
+
+  try {
+
+    const updatedAdmin = await AdminUser.findOneAndUpdate(
+      { shop: shop },
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAdmin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      profileImage: updatedAdmin.profileImage || "",
+    });
+  } catch (err) {
+    console.error("Update error:", err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

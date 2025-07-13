@@ -11,6 +11,64 @@ const saltRounds = 10;
 const multer = require('multer');
 const path = require('path');
 
+routers.post("/checkmail", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const existingUser = await user.findOne({ email });
+    if (existingUser) {
+      return res.json({ exists: true });
+    } else {
+      return res.json({ exists: false });
+    }
+  } catch (error) {
+    console.error("Error checking email:", error);
+    res.status(500).json({ exists: false, error: "Internal server error" });
+  }
+});
+
+routers.post("/createuser", async (req, res) => {
+  try {
+    const existingUser = await user.findOne({ email: req.body.email });
+    if (existingUser) {
+      return res.json({ success: false, message: "Email already exists" });
+    }
+    const salt = bcrypt.genSaltSync(saltRounds);
+    const hashpassword = bcrypt.hashSync(req.body.password, salt);
+    await user.create({
+      name: req.body.name,
+      email: req.body.email,
+      password: hashpassword,
+      mobileno: req.body.mobileno,
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.json({ success: false });
+  }
+}
+);
+
+// Login User
+routers.post("/loginuser",
+  async (req, res) => {
+    try {
+      const { email } = req.body;
+      let userData = await user.findOne({ email });
+
+
+      if (!userData || !bcrypt.compareSync(req.body.password, userData.password)) {
+        return res.status(400).json({ errors: "Invalid credentials" });
+      }
+
+      const token = jwt.sign({ id: userData._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      return res.json({ success: true, token });
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.json({ success: false });
+    }
+  }
+);
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, '../public/image'));
@@ -61,49 +119,6 @@ routers.put("/update-profile", auth, upload.single("image"), async (req, res) =>
   }
 });
 
-routers.post("/createuser", async (req, res) => {
-  try {
-    const existingUser = await user.findOne({ email: req.body.email });
-    if (existingUser) {
-      return res.json({ success: false, message: "Email already exists" });
-    }
-    const salt = bcrypt.genSaltSync(saltRounds);
-    const hashpassword = bcrypt.hashSync(req.body.password, salt);
-    await user.create({
-      name: req.body.name,
-      email: req.body.email,
-      password: hashpassword,
-      mobileno: req.body.mobileno,
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Error creating user:", error);
-    res.json({  success: false });
-  }
-}
-);
-
-// Login User
-routers.post("/loginuser",
-  async (req, res) => {
-    try {
-      const { email } = req.body;
-      let userData = await user.findOne({ email });
-
-
-      if (!userData || !bcrypt.compareSync(req.body.password, userData.password)) {
-        return res.status(400).json({ errors: "Invalid credentials" });
-      }
-
-      const token = jwt.sign({ id: userData._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-      return res.json({ success: true, token });
-    } catch (error) {
-      console.error("Error during login:", error);
-      res.json({ success: false });
-    }
-  }
-);
-
 routers.get("/user", auth, async (req, res) => {
   try {
     const userData = await user.findById(req.user.id);
@@ -124,8 +139,71 @@ routers.get("/user", auth, async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-let otpStore = {};
 
+
+let otpStore = {};
+//send otp for signup
+routers.post("/sendotp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore[email] = otp;
+    const transporter = require("nodemailer").createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your Signup OTP",
+      text: `Your OTP for registration is: ${otp}`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Failed to send OTP email:", error);
+        return res.json({ success: false, message: "Failed to send OTP" });
+      }
+      res.json({ success: true });
+    });
+  } catch (error) {
+    console.error("Error in /sendotp:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+// Verify OTP for signup
+routers.post("/verifyotp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: "Email and OTP are required" });
+    }
+
+    const storedOtp = otpStore[email];
+    if (!storedOtp) {
+      return res.status(400).json({ success: false, message: "OTP expired or not found" });
+    }
+
+    if (storedOtp !== otp) {
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    // OTP is correct, remove it from store
+    delete otpStore[email];
+
+    res.json({ success: true, message: "OTP verified" });
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+
+//send otp for reset password
 routers.post("/send-otp", async (req, res) => {
   const { email } = req.body;
 
@@ -155,18 +233,28 @@ routers.post("/send-otp", async (req, res) => {
   });
 });
 
-routers.post("/verify-otp-reset", async (req, res) => {
+// POST /verify-otp
+routers.post("/verify-otp", async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, message: "Missing fields" });
+  }
+
+  const storedOtp = otpStore[email];
+  if (!storedOtp || storedOtp !== otp) {
+    return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+  }
+
+  return res.json({ success: true, message: "OTP verified" });
+});
+// POST /reset-password
+routers.post("/reset-password", async (req, res) => {
   try {
-    const { email, otp, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!email || !otp || !password) {
+    if (!email || !password) {
       return res.status(400).json({ success: false, message: "Missing fields" });
-    }
-
-    // Check OTP
-    const storedOtp = otpStore[email];
-    if (!storedOtp || storedOtp !== otp) {
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
     }
 
     // Find user
@@ -179,11 +267,11 @@ routers.post("/verify-otp-reset", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Update user password
+    // Update password
     curruser.password = hashedPassword;
     await curruser.save();
 
-    // Clear OTP after use
+    // Clear OTP
     delete otpStore[email];
 
     res.json({ success: true, message: "Password updated successfully" });
@@ -192,6 +280,7 @@ routers.post("/verify-otp-reset", async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
+
 
 routers.post('/contactus', async (req, res) => {
   try {

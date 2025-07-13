@@ -17,7 +17,7 @@ const OrderSchema = new mongoose.Schema({
   totalAmount: Number,
   status: { type: String, enum: ['pending', 'preparing', 'out for delivery', 'delivered'], default: 'pending' },
   createdAt: { type: Date, default: Date.now },
-  deliveryLocation: String
+  deliveryLocation:{name: String, mobileno: String, location: String,_id: mongoose.Schema.Types.ObjectId},
 });
 
 module.exports = mongoose.model('orders', OrderSchema);
