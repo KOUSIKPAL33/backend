@@ -16,6 +16,9 @@ const OrderSchema = new mongoose.Schema({
   }],
   totalAmount: Number,
   status: { type: String, enum: ['pending', 'preparing', 'out for delivery', 'delivered'], default: 'pending' },
+  paymentMethod: { type: String, enum: ['cod', 'online'], default: 'cod' },
+  paymentStatus: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
+  paymentId: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
   deliveryLocation:{name: String, mobileno: String, location: String,_id: mongoose.Schema.Types.ObjectId},
 });

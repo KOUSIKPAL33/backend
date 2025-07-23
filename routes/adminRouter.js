@@ -65,7 +65,7 @@ router.post('/loginadmin', async (req, res) => {
   }
 });
 
-// PUT: Update product by ID in a shop-specific collection
+// PUT: Update product by ID in a shop-specific collection  
 
 router.put('/update/:id', upload.single('image'), async (req, res) => {
   const { id } = req.params;

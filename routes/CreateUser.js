@@ -8,8 +8,20 @@ const auth = require("../middleware/auth.js")
 const jwt = require('jsonwebtoken');
 const bcrypt = require("bcryptjs");
 const saltRounds = 10;
+
 const multer = require('multer');
 const path = require('path');
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../public/image'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage });
 
 routers.post("/checkmail", async (req, res) => {
   try {
@@ -69,27 +81,16 @@ routers.post("/loginuser",
   }
 );
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../public/image'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + '-' + file.originalname;
-    cb(null, uniqueName);
-  }
-});
 
-const upload = multer({ storage });
 
 // Update user profile (name, email, mobile, profile image)
-routers.put("/update-profile", auth, upload.single("image"), async (req, res) => {
+routers.put("/update-profile", auth, upload.single("profileImage"), async (req, res) => {
   try {
     const userId = req.user.id;
     const { name, email, mobile } = req.body;
     let updateData = { name, email, mobileno: mobile };
-    // If a new image is uploaded, save its path
-    if (req.file) {
-      // Save only the relative path or filename as needed
+
+    if (req.file && req.file.filename) {
       updateData.profileImage = `/image/${req.file.filename}`;
     }
 
