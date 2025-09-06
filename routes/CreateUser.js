@@ -11,6 +11,7 @@ const saltRounds = 10;
 
 const multer = require('multer');
 const path = require('path');
+const { request } = require("http");
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, '../public/image'));
@@ -44,8 +45,9 @@ routers.post("/createuser", async (req, res) => {
     if (existingUser) {
       return res.json({ success: false, message: "Email already exists" });
     }
+    const finalpassword = req.body.password || "google_oauth";
     const salt = bcrypt.genSaltSync(saltRounds);
-    const hashpassword = bcrypt.hashSync(req.body.password, salt);
+    const hashpassword = bcrypt.hashSync(finalpassword, salt);
     await user.create({
       name: req.body.name,
       email: req.body.email,
@@ -66,13 +68,13 @@ routers.post("/loginuser",
     try {
       const { email } = req.body;
       let userData = await user.findOne({ email });
-
-
+      req.body.password = req.body.password || "google_oauth";
       if (!userData || !bcrypt.compareSync(req.body.password, userData.password)) {
         return res.status(400).json({ errors: "Invalid credentials" });
       }
 
       const token = jwt.sign({ id: userData._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
       return res.json({ success: true, token });
     } catch (error) {
       console.error("Error during login:", error);

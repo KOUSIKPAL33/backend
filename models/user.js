@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, },
   email: { type: String, required: true, },
   password: { type: String, required: true, },
-  mobileno: { type: String, required: true, },
+  mobileno: { type: String, },
   shopping_cart: [{
     productId: { type: mongoose.Schema.ObjectId, required: true,},
     shopname:{type: String, required: true,},
@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
     }
   ],
   orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'orders' }],
-   profileImage: { type: String, default: "" },
+  profileImage: { type: String, default: "" },
 });
 
 module.exports = mongoose.model('users', userSchema);

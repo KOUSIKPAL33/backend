@@ -39,6 +39,8 @@ app.use('/api/cart', require("./routes/cartRouter"));
 app.use('/api/address',require("./routes/addressRoter"));
 app.use('/api/', require("./routes/adminRouter"));
 app.use('/api/order',require("./routes/ordersRouter"));
+const webhookRoutes = require('./routes/webhook');
+app.use('/webhook', webhookRoutes);
 app.use('/image', express.static(path.join(__dirname, 'public/image')));
 
 app.get('/api/config/razorpay', (req, res) => {

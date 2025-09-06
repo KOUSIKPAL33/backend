@@ -1,8 +1,14 @@
 const User = require('../models/user');
 const Order = require('../models/orders');
 
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripe = require('stripe')(stripeSecretKey);
+
 const createOrderController = async (req, res) => {
   const userId = req.user.id;
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required" });
+  }
   const { items, deliveryLocation, totalAmount, paymentMethod, paymentStatus, paymentId } = req.body;
 
   try {
@@ -67,6 +73,38 @@ const createOrderController = async (req, res) => {
   }
 };
 
+
+const stripeOrderController = async (req, res) => {
+  const userId = req.user.id;
+  const { items, deliveryLocation, totalAmount } = req.body;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'inr',
+          product_data: {
+            name: 'Order from InCampusFoods',
+          },
+          unit_amount: Math.round(totalAmount * 100), // Stripe expects amount in paise
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: 'http://localhost:5173/Myorders?success=true',
+      cancel_url: 'http://localhost:5173/Checkout?canceled=true',
+      metadata: {
+        userId,
+        items: JSON.stringify(items),
+        deliveryLocation: JSON.stringify(deliveryLocation),
+        totalAmount: totalAmount
+      },
+    });
+    res.json({ sessionId: session.id });
+  } catch (err) {
+    res.status(500).json({ error: 'Stripe session creation failed' });
+  }
+};
 
 const getShopOrdersController = async (req, res) => {
   const { shopName } = req.params;
@@ -152,7 +190,7 @@ const updateOrtdersController = async (req, res) => {
 
     // Update the overall order status based on all shop orders
     const allShopStatuses = order.ordersbyshop.map(shop => shop.status);
-    
+
     // If all shops are delivered, mark the entire order as delivered
     if (allShopStatuses.every(status => status === 'delivered')) {
       order.status = 'delivered';
@@ -166,8 +204,8 @@ const updateOrtdersController = async (req, res) => {
 
     await order.save();
 
-    res.status(200).json({ 
-      message: "Order status updated successfully", 
+    res.status(200).json({
+      message: "Order status updated successfully",
       updatedOrder: order,
       updatedShopOrder: order.ordersbyshop[shopOrderIndex]
     });
@@ -179,55 +217,9 @@ const updateOrtdersController = async (req, res) => {
 };
 
 const cancelOrderController = async (request, response) => {
-  
+
 };
 
-// Razorpay integration functions
-const createRazorpayOrderController = async (req, res) => {
-  try {
-    const Razorpay = require('razorpay');
-    const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-
-    const { amount, currency, receipt } = req.body;
-
-    const options = {
-      amount: amount,
-      currency: currency,
-      receipt: receipt,
-    };
-
-    const order = await razorpay.orders.create(options);
-    res.status(200).json({ orderId: order.id });
-  } catch (error) {
-    console.error('Razorpay order creation error:', error);
-    res.status(500).json({ error: 'Failed to create Razorpay order' });
-  }
-};
-
-const verifyPaymentController = async (req, res) => {
-  try {
-    const crypto = require('crypto');
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
-    const secret = process.env.Razorpay_key_secret;
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(razorpay_order_id + '|' + razorpay_payment_id)
-      .digest('hex');
-
-    if (razorpay_signature === expectedSignature) {
-      res.status(200).json({ verified: true });
-    } else {
-      res.status(400).json({ verified: false });
-    }
-  } catch (error) {
-    console.error('Payment verification error:', error);
-    res.status(500).json({ error: 'Payment verification failed' });
-  }
-};
 
 module.exports = {
   createOrderController,
@@ -235,6 +227,5 @@ module.exports = {
   getShopOrdersController,
   updateOrtdersController,
   cancelOrderController,
-  createRazorpayOrderController,
-  verifyPaymentController,
+  stripeOrderController
 };
