@@ -75,36 +75,71 @@ const createOrderController = async (req, res) => {
 
 
 const stripeOrderController = async (req, res) => {
+
   const userId = req.user.id;
+
   const { items, deliveryLocation, totalAmount } = req.body;
+
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: "Order must contain items." });
+  }
+  const groupedItems = items.reduce((acc, item) => {
+    if (!acc[item.shopname]) {
+      acc[item.shopname] = {
+        shopName: item.shopname,
+        items: [],
+        shopTotal: 0,
+      };
+    }
+    acc[item.shopname].items.push(item);
+    acc[item.shopname].shopTotal += item.price * item.quantity;
+    return acc;
+  }, {});
+
+  const ordersbyshop = Object.values(groupedItems);
+
   try {
+
+    const order = await Order.create({
+      userId,
+      ordersbyshop, 
+      deliveryLocation,
+      totalAmount,
+      status: "pending"
+    });
+
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'inr',
-          product_data: {
-            name: 'Order from InCampusFoods',
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "inr",
+            product_data: {
+              name: "Order from InCampusFoods",
+            },
+            unit_amount: Math.round(totalAmount * 100),
           },
-          unit_amount: Math.round(totalAmount * 100), // Stripe expects amount in paise
+          quantity: 1,
         },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      success_url: 'http://localhost:5173/Myorders?success=true',
-      cancel_url: 'http://localhost:5173/Checkout?canceled=true',
+      ],
+      mode: "payment",
+      success_url: "https://frontend-ecru-five-46.vercel.app/Myorders?success=true",
+      cancel_url: "https://frontend-ecru-five-46.vercel.app/Checkout?canceled=true",
       metadata: {
         userId,
-        items: JSON.stringify(items),
-        deliveryLocation: JSON.stringify(deliveryLocation),
-        totalAmount: totalAmount
+        orderId: order._id.toString(),
       },
     });
+
     res.json({ sessionId: session.id });
   } catch (err) {
-    res.status(500).json({ error: 'Stripe session creation failed' });
+    console.error("Stripe Session Error:", err);
+    res.status(500).json({ error: "Stripe session creation failed" });
   }
 };
+
+
+
 
 const getShopOrdersController = async (req, res) => {
   const { shopName } = req.params;

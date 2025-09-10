@@ -54,7 +54,41 @@ routers.post("/createuser", async (req, res) => {
       password: hashpassword,
       mobileno: req.body.mobileno,
     });
-    res.json({ success: true });
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Welcome to InCampusFood 🎉",
+    text: `Hello ${req.body.name},
+
+        Welcome to InCampusFood! 🎉  
+        Your account has been created successfully.
+
+        You can now explore our menu, order your favorite meals, and enjoy hassle-free campus dining.
+
+        If you have any questions or need help, feel free to reach out to our support team.
+
+        We're excited to have you onboard! 🚀
+
+        Best regards,  
+        InCampusFood Team
+        `
+        };
+
+
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) return res.json({ success: false, message: "Failed to send email" });
+      res.json({ success: true });
+    });
   } catch (error) {
     console.error("Error creating user:", error);
     res.json({ success: false });
@@ -227,8 +261,21 @@ routers.post("/send-otp", async (req, res) => {
     from: process.env.EMAIL_USER,
     to: email,
     subject: "Password Reset OTP",
-    text: `Your OTP is: ${otp}`,
+    text: `Hello,
+
+        We received a request to reset your password.
+        Here is your One-Time Password (OTP):
+
+        ${otp}
+
+        This OTP is valid for the next 15 minutes. 
+        If you did not request a password reset, please ignore this email.
+
+        Best regards,
+        InCampusFood Team
+        `
   };
+
 
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) return res.json({ success: false, message: "Failed to send email" });
@@ -276,6 +323,35 @@ routers.post("/reset-password", async (req, res) => {
 
     // Clear OTP
     delete otpStore[email];
+    // Send confirmation email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Changed Successfully",
+      text: `Hello,
+
+            Your account password has been changed successfully. 
+            If you made this change, no further action is required. 
+
+            If you did not request this change, please reset your password immediately or contact our support team.
+
+            Best regards,
+            InCampusFood Team`
+    };
+
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) return res.json({ success: false, message: "Failed to send email" });
+      res.json({ success: true });
+    });
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (error) {
